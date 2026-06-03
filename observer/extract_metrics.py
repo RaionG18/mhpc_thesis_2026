@@ -1,12 +1,10 @@
 import argparse
 import csv
-from datetime import datetime
 from pathlib import Path
 
 
 FIELDNAMES = [
-    "run_id", "timestamp",
-    "mode", "steps", "size", "elapsed_seconds",
+    "sweep", "rep", "mode", "steps", "size", "elapsed_seconds",
     "total_read_bytes", "total_write_bytes",
     "file_write_bytes", "pipe_write_bytes",
     "read_calls", "write_calls",
@@ -32,7 +30,7 @@ def parse_trace(trace_path):
     with open(trace_path, newline="") as f:
         reader = csv.DictReader(f, fieldnames=TRACE_FIELDS)
         for row in reader:
-            op   = row.get("op", "").strip()
+            op   = (row.get("op") or "").strip()
             path = (row.get("path") or "").strip()
             try:
                 result = int(row.get("result", 0))
@@ -60,21 +58,21 @@ def main():
     parser = argparse.ArgumentParser(
         description="Extract I/O metrics from a trace log and append to a CSV."
     )
-    parser.add_argument("trace",      type=Path, help="Trace log file")
-    parser.add_argument("--mode",     required=True, help="batch or stream")
-    parser.add_argument("--steps",    type=int, required=True)
-    parser.add_argument("--size",     type=int, required=True)
-    parser.add_argument("--elapsed",  type=float, required=True, help="Wall-clock seconds")
-    parser.add_argument("--output",   type=Path, required=True, help="Output CSV file")
-    parser.add_argument("--run-id",   required=True, help="Identifier shared by all modes in one run")
+    parser.add_argument("trace",     type=Path, help="Trace log file")
+    parser.add_argument("--mode",    required=True, help="batch or stream")
+    parser.add_argument("--steps",   type=int, required=True)
+    parser.add_argument("--size",    type=int, required=True)
+    parser.add_argument("--elapsed", type=float, required=True, help="Wall-clock seconds")
+    parser.add_argument("--sweep",   required=True, help="Swept parameter name (size|steps)")
+    parser.add_argument("--rep",     type=int, default=1, help="Repetition index")
+    parser.add_argument("--output",  type=Path, required=True, help="Output CSV file")
     args = parser.parse_args()
 
-    now = datetime.now()
     io_metrics = parse_trace(args.trace)
 
     row = {
-        "run_id":           args.run_id,
-        "timestamp":        now.strftime("%Y-%m-%dT%H:%M:%S"),
+        "sweep":            args.sweep,
+        "rep":              args.rep,
         "mode":             args.mode,
         "steps":            args.steps,
         "size":             args.size,

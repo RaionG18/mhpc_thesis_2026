@@ -1,7 +1,7 @@
 set terminal gif animate delay 8 size 700,700
 set output output_dir . "/simulation.gif"
 
-# Variables frame_count and output_dir are passed via -e from run_workflow.sh
+# Variables frame_count and output_dir are passed via -e from visualize.sh
 frames_directory = output_dir . "/frames"
 predictions_file = output_dir . "/predictions_batch.csv"
 

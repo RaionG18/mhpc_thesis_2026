@@ -53,12 +53,43 @@ static void resolve_proc_fd(int fd) {
     }
 }
 
-static void log_event(const char *op, int fd, size_t count, ssize_t result) {
-    if (log_fd < 0 || fd == log_fd) {
+/* Read /proc/self/cmdline using raw syscalls so we don't recurse into our
+   own read() hook. Args are NUL-separated; convert to spaces and strip any
+   CSV-breaking characters since the result goes in the last (path) field. */
+static void read_cmdline(char *buf, size_t bufsize) {
+    buf[0] = '\0';
+
+    int fd = (int)syscall(SYS_openat, AT_FDCWD, "/proc/self/cmdline", O_RDONLY, 0);
+    if (fd < 0) {
         return;
     }
 
-    const char *path = (fd >= 0 && fd < MAX_FDS) ? fd_paths[fd] : "";
+    ssize_t n = syscall(SYS_read, fd, buf, bufsize - 1);
+    syscall(SYS_close, fd);
+
+    if (n <= 0) {
+        buf[0] = '\0';
+        return;
+    }
+
+    for (ssize_t i = 0; i < n; i++) {
+        char c = buf[i];
+        if (c == '\0' || c == ',' || c == '\n' || c == '\r') {
+            buf[i] = ' ';
+        }
+    }
+    buf[n] = '\0';
+
+    while (n > 0 && buf[n - 1] == ' ') {
+        buf[--n] = '\0';
+    }
+}
+
+static void log_line(const char *op, int fd, size_t count, ssize_t result,
+                     const char *path) {
+    if (log_fd < 0) {
+        return;
+    }
 
     char line[MAX_PATH + 128];
     int len = snprintf(
@@ -71,12 +102,21 @@ static void log_event(const char *op, int fd, size_t count, ssize_t result) {
         fd,
         count,
         result,
-        path
+        path ? path : ""
     );
 
     if (len > 0) {
         syscall(SYS_write, log_fd, line, (size_t)len);
     }
+}
+
+static void log_event(const char *op, int fd, size_t count, ssize_t result) {
+    if (log_fd < 0 || fd == log_fd) {
+        return;
+    }
+
+    const char *path = (fd >= 0 && fd < MAX_FDS) ? fd_paths[fd] : "";
+    log_line(op, fd, count, result, path);
 }
 
 __attribute__((constructor))
@@ -107,10 +147,18 @@ static void init_iotrace(void) {
     resolve_proc_fd(0);
     resolve_proc_fd(1);
     resolve_proc_fd(2);
+
+    /* Emit a process-start marker carrying the command line, so the timeline
+       analysis can map each PID to its pipeline stage and bound its lifespan. */
+    char cmdline[MAX_PATH];
+    read_cmdline(cmdline, sizeof(cmdline));
+    log_line("start", -1, 0, 0, cmdline);
 }
 
 __attribute__((destructor))
 static void fini_iotrace(void) {
+    log_line("exit", -1, 0, 0, "");
+
     if (log_fd >= 0) {
         syscall(SYS_close, log_fd);
         log_fd = -1;

@@ -1,4 +1,5 @@
 *.dat
 ml_workflow/output
 ml_workflow/traces
+ml_workflow/results
 *.so
