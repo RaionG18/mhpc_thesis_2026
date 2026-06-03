@@ -1,2 +1,0 @@
-# No third-party dependencies — all scripts use Python stdlib only.
-# Python >= 3.8 required.
