@@ -1,0 +1,10 @@
+# Build/run artifacts
+*.so
+*.o
+capio_iouring/demo
+capio_iouring/demo.txt
+
+# Editor/OS noise
+.vscode/
+*.swp
+.DS_Store

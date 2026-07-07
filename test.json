@@ -1,0 +1,21 @@
+{
+    "name" : "test",
+    "IO_Graph" : [
+        {
+            "name" : "writer",
+            "input_stream" : [],
+            "output_stream" : ["test.txt"],
+            "streaming" : [
+                {
+                  "name" : ["test.txt"],
+                  "committed" : "on_close",
+                  "mode" : "no_update"  
+                }
+            ]
+        },{
+            "name" : "reader",
+            "input_stream" : ["test.txt"],
+            "output_stream" : []
+        }
+    ]
+}
