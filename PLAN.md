@@ -149,7 +149,7 @@ Detalle en §8.
 
 Ubicación propuesta: `examples/io_uring/` (siguiendo la convención de `examples/mpi_io_examples/`).
 
-- **Un solo par producer/consumer en C** que replica el benchmark *1-to-1* del paper (Fig. 5), con flags `-n` (nº archivos), `-s` (tamaño), `-b` (chunk), `-q` (queue depth) y `-e posix|uring`. Ambos motores en el mismo binario → comparación A/B limpia y valor didáctico ("mismo workflow, dos APIs").
+- **Un solo par producer/consumer en C++** que replica el benchmark *1-to-1* del paper (Fig. 5), con flags `-r producer|consumer` (rol), `-n` (nº archivos), `-f` (tamaño de archivo), `-c` (chunk), `-q` (queue depth), `-e posix|io_uring` y `-d` (directorio). Ambos motores en el mismo binario → comparación A/B limpia y valor didáctico ("mismo workflow, dos APIs"). *Nota (2026-07-21): originalmente planeado en C plano; se pasó a C++ (C++17) para mimetizarse con el resto del repo, que es todo C++ — decisión relevante para la aceptación del PR. liburing (API de C) se usa sin fricción desde C++.*
 - **Verificación por checksum** integrada (como los benchmarks del paper): convierte el ejemplo en test de regresión, no solo demo.
 - **JSON de configuración** calcado al de Fig. 5 (`on_close` + `no_update`) para conectar el ejemplo con la semántica.
 - **README didáctico**: qué es io_uring en 10 líneas, cómo lanzarlo con y sin CAPIO, salida esperada.
@@ -246,7 +246,7 @@ Sobre *"novelty over length"*: el claim de novedad es preciso y defendible — *
 
 **Pendiente con el supervisor:** acordar si el ejemplo upstream vive solo en `examples/` o también como integration test en `capio/tests/integration`.
 
-**Próxima acción:** arrancar F1 (producer/consumer con liburing).
+**Próxima acción:** F1 en curso (2026-07-21). Hito 1 (parseo CLI de `one_to_one`, en C++) cerrado y verificado. Sigue: `CMakeLists.txt` del ejemplo (pkg-config liburing) y Hito 2 (checksum FNV-1a + patrón determinista).
 
 ---
 
