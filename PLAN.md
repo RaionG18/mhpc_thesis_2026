@@ -97,8 +97,10 @@ Compilar CAPIO `main`, correr la suite de tests, reproducir el patrón 1-to-1 PO
 
 Sin tocar CAPIO todavía. Detalle en §6.
 
-- [ ] Corre sobre FS plano, checksums producer/consumer idénticos
-- [ ] PR abierto upstream
+- [x] Corre sobre FS plano, checksums producer/consumer idénticos
+- [x] Las cuatro configuraciones medidas (FS/CAPIO × posix/uring); CAPIO-uring falla con `EBADF` → el gap que motiva la tesis, medido
+
+*Actualización (2026-08-04): **F1 no lleva PR upstream.** El aparato actual (dos motores, `engine_test.cpp`, `bench.sh` 4-config) es instrumento de medición, no entregable: existe para producir los números del cap. 6 y la evidencia de la defensa. El ejemplo que vaya a `examples/` se limpiará **al final**, cuando CAPIO funcione con uring, y será simple y solo-uring — no tiene sentido publicar un ejemplo que documenta un fallo que para entonces estará arreglado. Nada se borra del fork mientras tanto: el motor POSIX es el grupo de control (prueba que CAPIO funciona y aísla a uring como lo que rompe) y `bench.sh` se re-ejecuta en F6.*
 
 ### F2 — Tracing a nivel syscall + spike de la opción A (~2 semanas)
 
@@ -107,7 +109,7 @@ Sin tocar CAPIO todavía. Detalle en §6.
 - [ ] El demo bajo CAPIO loguea setup/enter
 - [ ] Documentados los offsets/flags de mmap observados
 
-**F2b · Spike de la opción A (~1 semana, time-box estricto).** No se intenta completar A: el objetivo es producir las tres demostraciones de fallo que justifican B (material directo para el cap. 4 y la defensa). Reglas de contención: time-box de una semana, y el código vive en el repo de tesis (`spikes/liburing-interposition/`), **nunca en el fork de CAPIO** — el fork queda limpio para el PR upstream.
+**F2b · Spike de la opción A (~1 semana, time-box estricto).** No se intenta completar A: el objetivo es producir las tres demostraciones de fallo que justifican B (material directo para el cap. 4 y la defensa). Reglas de contención: time-box de una semana, y el código vive en el repo de tesis (`spikes/liburing-interposition/`), **nunca en el fork de CAPIO** — el fork queda limpio para la limpieza final de `examples/` y el PR que salga de ella.
 
 - [ ] **Símbolos inline:** `nm -D` sobre `liburing.so` muestra que `get_sqe`/`cqe_seen`/fast-path de peek no existen como símbolos; un bucle de `io_uring_peek_cqe` puro nunca pasa por el interposer
 - [ ] **Enlace estático:** el demo compilado con liburing estático deja al observer completamente ciego
@@ -145,18 +147,25 @@ Detalle en §8.
 
 ---
 
-## 6. Entregable A: el ejemplo para el repo de CAPIO
+## 6. Entregable A: el banco de medición (y, al final, el ejemplo)
 
-Ubicación propuesta: `examples/io_uring/` (siguiendo la convención de `examples/mpi_io_examples/`).
+*Revisado el 2026-08-04.* Este entregable tiene **dos vidas**, y conviene no confundirlas:
 
-- **Un solo par producer/consumer en C++** que replica el benchmark *1-to-1* del paper (Fig. 5), con flags `-r producer|consumer` (rol), `-n` (nº archivos), `-f` (tamaño de archivo), `-c` (chunk), `-q` (queue depth), `-e posix|io_uring` y `-d` (directorio). Ambos motores en el mismo binario → comparación A/B limpia y valor didáctico ("mismo workflow, dos APIs"). *Nota (2026-07-21): originalmente planeado en C plano; se pasó a C++ (C++17) para mimetizarse con el resto del repo, que es todo C++ — decisión relevante para la aceptación del PR. liburing (API de C) se usa sin fricción desde C++.*
-- **Verificación por checksum** integrada (como los benchmarks del paper): convierte el ejemplo en test de regresión, no solo demo.
-- **JSON de configuración** calcado al de Fig. 5 (`on_close` + `no_update`) para conectar el ejemplo con la semántica.
-- **README didáctico**: qué es io_uring en 10 líneas, cómo lanzarlo con y sin CAPIO, salida esperada.
-- Restricción deliberada: **sin** fixed files/buffers, **sin** SQPOLL — solo lo que el MVP soportará.
-- Si los maintainers acceden, añadirlo también a `capio/tests/integration` para que CI lo ejecute.
+1. **Ahora — banco de medición** (`examples/io_uring/` en el fork, sin PR). Dos motores en un binario, `engine_test.cpp` y `bench.sh` 4-config. Su trabajo es producir números y evidencia: la tabla de cuatro filas del cap. 6 y de la defensa, y la demostración del `EBADF`. El motor POSIX es el **grupo de control** — sin él no se puede afirmar que CAPIO funciona y que lo que rompe es específicamente io_uring. Se conserva íntegro y se re-ejecuta en F6.
+2. **Al final — el ejemplo publicable.** Cuando F3+ haga que CAPIO funcione con uring, se limpia `examples/` y queda un ejemplo **simple y solo-uring**, sin motor POSIX, sin batería de tests, sin benchmark. Publicar antes carecería de sentido: el ejemplo de hoy documenta un fallo que para entonces estará arreglado.
 
-**Abrir este PR temprano y desacoplado** de la intercepción: (a) da el baseline de F1, (b) establece al autor como contribuidor antes del PR grande, (c) fija las convenciones con los maintainers.
+Lo que sigue describe el banco actual; los puntos marcados *(→ ejemplo)* son los que sobreviven a la limpieza final.
+
+Ubicación: `examples/io_uring/` (siguiendo la convención de `examples/mpi_io_examples/`).
+
+- **Un solo par producer/consumer en C++** que replica el benchmark *1-to-1* del paper (Fig. 5), con flags `-r producer|consumer` (rol), `-n` (nº archivos), `-f` (tamaño de archivo), `-c` (chunk), `-q` (queue depth), `-e posix|io_uring` y `-d` (directorio). Ambos motores en el mismo binario → comparación A/B limpia. *(→ ejemplo: sobrevive el par producer/consumer sobre uring; desaparecen el flag `-e` y el motor POSIX.)* *Nota (2026-07-21): originalmente planeado en C plano; se pasó a C++ (C++17) para mimetizarse con el resto del repo, que es todo C++. liburing (API de C) se usa sin fricción desde C++.*
+- **Verificación por checksum** integrada (como los benchmarks del paper): hace del banco un verificador de corrección, no solo un cronómetro. *(→ ejemplo: sobrevive.)* *Nota (2026-08-04): la comparación se hace por `memcmp` contra el patrón regenerado; FNV-1a queda solo como checksum publicado por el productor. Un hash de 64 bits admite colisiones, y un verificador con falsos negativos no verifica.*
+- **JSON de configuración** calcado al de Fig. 5 (`on_close` + `no_update`) para conectar el ejemplo con la semántica. *(→ ejemplo: sobrevive.)*
+- **README didáctico**: qué es io_uring en 10 líneas, cómo lanzarlo con y sin CAPIO, salida esperada. *(→ ejemplo: sobrevive, reescrito — hoy documenta el fallo `EBADF`, que para entonces estará arreglado.)*
+- Restricción deliberada: **sin** fixed files/buffers, **sin** SQPOLL — solo lo que el MVP soportará. *(→ ejemplo: sobrevive.)*
+- `engine_test.cpp` (batería de auto-verificación, 8 checks por motor + equivalencia cruzada) y `bench.sh` (4 configuraciones, mediana, CSV): **instrumento**, no entregable. *(→ ejemplo: se quedan fuera.)*
+
+**Sin PR upstream para F1.** El PR único llega al final, con el ejemplo limpio y ya sobre CAPIO-uring funcionando. El objetivo original de "establecer al autor como contribuidor antes del PR grande" ya está cubierto por otra vía: el **PR #243 se mergeó el 2026-07-22** (`5a6097d`, aprobado por GlassOfWhiskey), que salió de reproducir el baseline en F0.
 
 ---
 
@@ -244,9 +253,11 @@ Sobre *"novelty over length"*: el claim de novedad es preciso y defendible — *
 
 **Resuelto:** el supervisor confirma la opción **B** (emulación a nivel syscall). A se conserva como spike time-boxed (F2b) para derivar los requisitos de B y sostener la narrativa de la defensa.
 
-**Pendiente con el supervisor:** acordar si el ejemplo upstream vive solo en `examples/` o también como integration test en `capio/tests/integration`.
+**Aplazado (2026-08-04):** si el ejemplo vive solo en `examples/` o también como integration test en `capio/tests/integration` se decide **al limpiar `examples/` al final**, no ahora — el ejemplo publicable aún no existe.
 
-**Próxima acción:** F1 en curso (2026-07-21). Hito 1 (parseo CLI de `one_to_one`, en C++) cerrado y verificado. Sigue: `CMakeLists.txt` del ejemplo (pkg-config liburing) y Hito 2 (checksum FNV-1a + patrón determinista).
+**Estado (2026-08-04):** F1 cerrado. Los cuatro hitos hechos y verificados: CLI, FNV-1a + patrón determinista, motor POSIX, motor io_uring con batching. Las cuatro configuraciones medidas (`bench_results.csv`), batería de auto-verificación verde en ambos motores, y el fallo `CAPIO-uring → EBADF` reproducido y documentado. Slides de la charla de avance montadas (`capio_iouring_defense.pptx`).
+
+**Próxima acción:** F2a — tracing de 425–427 con handlers de solo-log que devuelven `1`. Requiere **recompilar CAPIO con `-DCAPIO_LOG=TRUE`**: el build actual tiene `CAPIO_LOG:BOOL=OFF` y el servidor no registra el manejo de peticiones.
 
 ---
 
